@@ -6,18 +6,17 @@ import os
 # Add src to python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src.agent.main import run_query
+from src.agent.main import generate_leads
 from src.agent.models.lead import Lead
 
 class TestMainOrchestrator(unittest.TestCase):
 
-    @patch('src.agent.main.ExcelWriter')
     @patch('src.agent.main.Deduplicator')
     @patch('src.agent.main.Scorer')
     @patch('src.agent.main.discover_scrapers')
     @patch('src.agent.main.KeywordExpander')
     @patch('src.agent.main.IntentParser')
-    def test_orchestrator_flow(self, MockIntentParser, MockKeywordExpander, mock_discover_scrapers, MockScorer, MockDeduplicator, MockExcelWriter):
+    def test_orchestrator_flow(self, MockIntentParser, MockKeywordExpander, mock_discover_scrapers, MockScorer, MockDeduplicator):
         # 1. Setup Mocks
         mock_intent_parser = MockIntentParser.return_value
         mock_intent_parser.parse.return_value = {'industry': 'hotels', 'location': 'england'}
@@ -50,11 +49,9 @@ class TestMainOrchestrator(unittest.TestCase):
         deduplicated_list = [Lead(name='Lead 1', company='Company 1'), Lead(name='Lead 2', company='Company 2')]
         mock_deduplicator.deduplicate.return_value = deduplicated_list
 
-        mock_excel_writer = MockExcelWriter.return_value
-
         # 2. Call the function under test
         query = "Hotels in England that may need POS"
-        run_query(query)
+        result = generate_leads(query, selected_scraper_names=["GoogleScraper", "LinkedInPublicScraper"])
 
         # 3. Assertions
         MockIntentParser.assert_called_once()
@@ -79,8 +76,9 @@ class TestMainOrchestrator(unittest.TestCase):
         MockDeduplicator.assert_called_once()
         self.assertEqual(len(mock_deduplicator.deduplicate.call_args[0][0]), 2)
 
-        MockExcelWriter.assert_called_once_with(filename="leads_output.xlsx")
-        mock_excel_writer.save.assert_called_once_with(deduplicated_list)
+        # Check the final returned leads
+        self.assertEqual(result['leads'], deduplicated_list)
+        self.assertEqual(result['total_scraped'], 2)
 
 
 if __name__ == '__main__':

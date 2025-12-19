@@ -30,22 +30,30 @@ class KeywordExpander:
         """
         industry = parsed_intent.get("industry", "")
         location = parsed_intent.get("location", "")
-        pain_point = parsed_intent.get("pain_point_need", "")
+        pain_point = parsed_intent.get("pain_point_need") # No default, can be None
 
         # --- Synonyms and Keyword Expansion ---
         industry_synonyms = [industry] + self.synonym_map.get(industry, [])
-        pain_point_synonyms = [pain_point] + self.synonym_map.get(pain_point, [])
+        pain_point_synonyms = []
+        if pain_point:
+            pain_point_synonyms = [pain_point] + self.synonym_map.get(pain_point, [])
 
         expanded_keywords = [f"{i} {p}" for i in industry_synonyms for p in pain_point_synonyms]
+        if not expanded_keywords and industry:
+             expanded_keywords = industry_synonyms # Fallback to just industry
         if location:
             expanded_keywords.extend([f"{k} in {location}" for k in expanded_keywords])
 
         # --- Hashtags ---
-        hashtags = {f"#{industry}", f"#{pain_point}"}
+        hashtags = {f"#{industry}"}
+        if pain_point:
+            hashtags.add(f"#{pain_point}")
         if location:
             hashtags.add(f"#{location.replace(' ', '')}")
+
         hashtags.update([f"#{s.replace(' ', '')}" for s in industry_synonyms])
-        hashtags.update([f"#{s.replace(' ', '')}" for s in pain_point_synonyms])
+        if pain_point_synonyms:
+            hashtags.update([f"#{s.replace(' ', '')}" for s in pain_point_synonyms])
 
         # --- Platform Specific Queries ---
         platform_specific = {
@@ -59,7 +67,7 @@ class KeywordExpander:
             "expanded_keywords": expanded_keywords,
             "synonyms": {
                 industry: industry_synonyms,
-                pain_point: pain_point_synonyms,
+                str(pain_point): pain_point_synonyms,
             },
             "hashtags": sorted(list(hashtags)),
             "platform_specific": platform_specific,
@@ -71,11 +79,14 @@ class KeywordExpander:
 
         # Dynamically build "OR" clauses for all available synonyms.
         industry_clause = " OR ".join(f'"{s}"' for s in industry_synonyms)
-        pain_point_clause = " OR ".join(f'"{s}"' for s in pain_point_synonyms)
+
+        pain_point_clause = ""
+        if pain_point_synonyms:
+            pain_point_clause = " OR ".join(f'"{s}"' for s in pain_point_synonyms)
 
         for title in titles:
             query = f'{title} ({industry_clause})'
-            if pain_point:
+            if pain_point and pain_point_clause:
                 query += f' ({pain_point_clause})'
             if location:
                 query += f' "{location}"'
@@ -84,12 +95,21 @@ class KeywordExpander:
 
     def _generate_google_queries(self, industry: str, pain_point: str, location: str, expanded_keywords: List[str]) -> List[str]:
         queries = []
-        if location:
-            # Replace unreliable site:.tld search with a more robust query including the location name.
+        # Fallback to a generic query if expanded_keywords is empty
+        if not expanded_keywords:
+            main_keyword = industry
+            if location:
+                main_keyword += f' in {location}'
+            return [main_keyword]
+
+        if location and pain_point:
             queries.append(f'"{industry}" "{pain_point}" "{location}" inurl:"contact"')
-        queries.append(f'"{industry} looking for {pain_point}"')
-        queries.append(f'intitle:"{industry}" AND ("{pain_point}" OR "{expanded_keywords[0]}")')
-        if location:
+        if pain_point:
+            queries.append(f'"{industry} looking for {pain_point}"')
+
+        queries.append(f'intitle:"{industry}" AND ("{pain_point or expanded_keywords[0]}")')
+
+        if location and pain_point:
             queries.append(f'"{location} {industry}" +"{pain_point}"')
         return queries
 

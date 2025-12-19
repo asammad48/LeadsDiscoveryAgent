@@ -7,3 +7,6 @@ webdriver-manager
 duckduckgo-search
 facebook-scraper
 instaloader
+fastapi
+uvicorn[standard]
+python-multipart
