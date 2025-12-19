@@ -3,20 +3,19 @@ from unittest.mock import patch, Mock
 import sys
 import os
 
-# Add the src directory to the Python path
-# This is necessary for the test to find the modules in the src directory
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+# Add src to python path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from modules.google_scraper import scrape_google
+from src.agent.sources.google_scraper import GoogleScraper
+from src.agent.models.lead import Lead
 
 class TestGoogleScraper(unittest.TestCase):
 
-    @patch('modules.google_scraper.requests.get')
+    @patch('src.agent.sources.google_scraper.requests.get')
     def test_scrape_google_parses_html_correctly(self, mock_get):
         """
-        Tests that the scrape_google function correctly parses a sample HTML string.
+        Tests that the GoogleScraper class correctly parses a sample HTML string.
         """
-        # Sample HTML content mimicking Google's search result structure
         sample_html = """
         <html>
             <body>
@@ -36,22 +35,24 @@ class TestGoogleScraper(unittest.TestCase):
         </html>
         """
 
-        # Configure the mock response
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.text = sample_html
         mock_get.return_value = mock_response
 
-        # Call the function
-        results = scrape_google("test query")
+        scraper = GoogleScraper(query="test query")
+        results = scraper.scrape()
 
-        # Expected results
-        expected_results = [
-            {'title': 'Result 1 Title', 'url': 'https://example.com/result1', 'snippet': 'Result 1 Snippet'},
-            {'title': 'Result 2 Title', 'url': 'https://example.com/result2', 'snippet': 'Result 2 Snippet'}
+        expected_leads = [
+            Lead(name='Result 1 Title', company='Result 1 Title', website='https://example.com/result1', notes='Result 1 Snippet', source='Google'),
+            Lead(name='Result 2 Title', company='Result 2 Title', website='https://example.com/result2', notes='Result 2 Snippet', source='Google')
         ]
 
-        self.assertEqual(results, expected_results)
+        self.assertEqual(len(results), len(expected_leads))
+        for i, lead in enumerate(results):
+            self.assertEqual(lead.name, expected_leads[i].name)
+            self.assertEqual(lead.website, expected_leads[i].website)
+            self.assertEqual(lead.notes, expected_leads[i].notes)
 
 if __name__ == '__main__':
     unittest.main()

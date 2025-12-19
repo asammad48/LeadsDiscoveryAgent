@@ -48,19 +48,54 @@ def run_query(query: str):
     print("3. Scraping all platforms...")
     scraper_classes = discover_scrapers()
     all_leads = []
+    platform_queries = expanded_keywords.get('platform_specific', {})
+
     for scraper_class in scraper_classes:
-        # Mocking scraper instantiation and execution for this example
-        print(f"   - Running scraper: {scraper_class.__name__}")
-        # In a real scenario, you would instantiate and call scrape:
-        # scraper_instance = scraper_class(...)
-        # leads = scraper_instance.scrape()
-        # For this example, we'll create mock leads
-        mock_leads = [
-            Lead(name=f"{scraper_class.__name__} Lead 1", company=f"Company for {intent['industry']}", website=f"www.{intent['industry']}1.com", source=scraper_class.__name__),
-            Lead(name=f"{scraper_class.__name__} Lead 2", company=f"Another {intent['industry']} Corp", website=f"www.another{intent['industry']}.com", source=scraper_class.__name__)
-        ]
-        all_leads.extend(mock_leads)
-    print(f"   - Scraped {len(all_leads)} leads.")
+        scraper_name = scraper_class.__name__
+        platform_name = scraper_name.replace('Scraper', '').lower()
+
+        # Map scraper names to platform keys used in KeywordExpander
+        if 'linkedin' in platform_name:
+            platform_name = 'linkedin'
+        elif 'google' in platform_name:
+            platform_name = 'google'
+        elif 'facebook' in platform_name:
+            platform_name = 'facebook'
+        elif 'instagram' in platform_name:
+            platform_name = 'instagram'
+
+        queries = platform_queries.get(platform_name, [query]) # Fallback to original query
+
+        print(f"   - Running scraper: {scraper_name} for platform '{platform_name}'")
+
+        for q in queries:
+            try:
+                # Instantiate the scraper with the specific query
+                scraper_instance = scraper_class(query=q)
+
+                # Handle Selenium scrapers that need a context manager
+                if hasattr(scraper_instance, '__enter__'):
+                    with scraper_instance as scraper:
+                        leads = scraper.scrape()
+                else:
+                    leads = scraper_instance.scrape()
+
+                all_leads.extend(leads)
+                if leads:
+                    print(f"      -> Found {len(leads)} leads from query: '{q[:60]}...'")
+
+            except TypeError as e:
+                # This catches scrapers with constructors not matching `__init__(self, query)`
+                # This is a temporary measure to allow for incremental refactoring of scrapers.
+                if 'required positional argument' in str(e) or 'unexpected keyword argument' in str(e):
+                     print(f"   - SKIPPING scraper: {scraper_name} due to incompatible constructor.")
+                else:
+                     print(f"   - ERROR instantiating {scraper_name}: {e}")
+                break # Stop trying queries for this incompatible scraper
+            except Exception as e:
+                print(f"   - ERROR running scraper {scraper_name} with query '{q}': {e}")
+
+    print(f"   - Scraped a total of {len(all_leads)} leads.")
 
     # 4. Score leads
     print("4. Scoring leads...")
