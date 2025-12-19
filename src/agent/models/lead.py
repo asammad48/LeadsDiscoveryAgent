@@ -6,6 +6,7 @@ class Lead:
     """Data model for a lead."""
     name: str
     company: str
+    city: Optional[str] = None
     title: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
