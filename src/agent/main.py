@@ -2,7 +2,7 @@ import os
 import sys
 import glob
 import importlib
-from typing import List
+from typing import List, Dict, Any
 
 # Add src to python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
@@ -15,7 +15,7 @@ from src.modules.deduplicator import Deduplicator
 from src.agent.storage.excel_writer import ExcelWriter
 from src.agent.sources.base_source import BaseSource
 
-def discover_scrapers() -> List[BaseSource]:
+def discover_scrapers() -> List[type[BaseSource]]:
     """Dynamically discovers all scraper classes in the sources directory."""
     scrapers = []
     sources_path = os.path.join(os.path.dirname(__file__), 'sources')
@@ -28,9 +28,12 @@ def discover_scrapers() -> List[BaseSource]:
                 scrapers.append(attribute)
     return scrapers
 
-def run_query(query: str):
-    """Runs the entire lead generation process for a given query."""
-    print(f"--- Running query: '{query}' ---")
+def generate_leads(query: str, selected_scraper_names: List[str] = None, confidence_threshold: float = 0.0) -> Dict[str, Any]:
+    """
+    Generates leads based on a query, selected scrapers, and confidence score.
+    This is the core logic function that will be used by the API.
+    """
+    print(f"--- Generating leads for query: '{query}' ---")
 
     # 1. Parse intent
     print("1. Parsing intent...")
@@ -44,9 +47,15 @@ def run_query(query: str):
     expanded_keywords = expander.expand(intent)
     print(f"   - Expanded keywords: {expanded_keywords['expanded_keywords'][:5]}...")
 
-    # 3. Scrape all platforms
-    print("3. Scraping all platforms...")
-    scraper_classes = discover_scrapers()
+    # 3. Scrape platforms
+    print("3. Scraping platforms...")
+    all_scraper_classes = discover_scrapers()
+
+    if selected_scraper_names:
+        scraper_classes = [s for s in all_scraper_classes if s.__name__ in selected_scraper_names]
+    else:
+        scraper_classes = all_scraper_classes
+
     all_leads = []
     platform_queries = expanded_keywords.get('platform_specific', {})
 
@@ -70,28 +79,15 @@ def run_query(query: str):
 
         for q in queries:
             try:
-                # Instantiate the scraper with the specific query
                 scraper_instance = scraper_class(query=q)
-
-                # Handle Selenium scrapers that need a context manager
                 if hasattr(scraper_instance, '__enter__'):
                     with scraper_instance as scraper:
                         leads = scraper.scrape()
                 else:
                     leads = scraper_instance.scrape()
-
                 all_leads.extend(leads)
                 if leads:
                     print(f"      -> Found {len(leads)} leads from query: '{q[:60]}...'")
-
-            except TypeError as e:
-                # This catches scrapers with constructors not matching `__init__(self, query)`
-                # This is a temporary measure to allow for incremental refactoring of scrapers.
-                if 'required positional argument' in str(e) or 'unexpected keyword argument' in str(e):
-                     print(f"   - SKIPPING scraper: {scraper_name} due to incompatible constructor.")
-                else:
-                     print(f"   - ERROR instantiating {scraper_name}: {e}")
-                break # Stop trying queries for this incompatible scraper
             except Exception as e:
                 print(f"   - ERROR running scraper {scraper_name} with query '{q}': {e}")
 
@@ -110,29 +106,48 @@ def run_query(query: str):
     deduplicated_leads = deduplicator.deduplicate(all_leads)
     print(f"   - Deduplicated to {len(deduplicated_leads)} leads.")
 
-    # 6. Save to Excel
-    print("6. Saving to Excel...")
-    excel_writer = ExcelWriter(filename="leads_output.xlsx")
-    excel_writer.save(deduplicated_leads)
-    print("   - Saved to leads_output.xlsx")
+    # 6. Filter by confidence score
+    if confidence_threshold > 0.0:
+        print(f"6. Filtering leads with confidence >= {confidence_threshold}...")
+        final_leads = [lead for lead in deduplicated_leads if getattr(lead, 'confidence_score', 0.0) >= confidence_threshold]
+        print(f"   - Filtered down to {len(final_leads)} leads.")
+    else:
+        final_leads = deduplicated_leads
 
-    # 7. Print summary report
-    print("\n--- Summary Report ---")
-    print(f"Query: '{query}'")
-    print(f"Parsed Intent: {intent}")
-    print(f"Total Leads Scraped: {len(all_leads)}")
-    print(f"Unique Leads Found: {len(deduplicated_leads)}")
-    print("--- End of Report ---\n")
+    return {
+        "leads": final_leads,
+        "total_scraped": len(all_leads),
+        "unique_leads_before_filtering": len(deduplicated_leads),
+        "intent": intent,
+    }
 
 def main():
-    """Main execution function."""
+    """Main execution function for command-line usage."""
     queries = [
         "Hotels in England that may need POS",
         "Restaurants in London looking for a new website",
         "Software companies in San Francisco"
     ]
+
+    all_scraper_classes = discover_scrapers()
+    scraper_names = [scraper.__name__ for scraper in all_scraper_classes]
+
     for query in queries:
-        run_query(query)
+        result = generate_leads(query, selected_scraper_names=scraper_names)
+
+        # Save to Excel
+        print("7. Saving to Excel...")
+        excel_writer = ExcelWriter(filename="leads_output.xlsx")
+        excel_writer.save(result["leads"])
+        print("   - Saved to leads_output.xlsx")
+
+        # Print summary report
+        print("\n--- Summary Report ---")
+        print(f"Query: '{query}'")
+        print(f"Parsed Intent: {result['intent']}")
+        print(f"Total Leads Scraped: {result['total_scraped']}")
+        print(f"Unique Leads Found: {len(result['leads'])}")
+        print("--- End of Report ---\n")
 
 if __name__ == "__main__":
     main()
