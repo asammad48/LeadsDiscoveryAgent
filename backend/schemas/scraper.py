@@ -7,3 +7,4 @@ class ScraperRequest(BaseModel):
 class ScraperResponse(BaseModel):
     message: str
     filename: Optional[str] = None
+    results: Optional[list] = None
