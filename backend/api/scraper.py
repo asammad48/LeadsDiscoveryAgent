@@ -9,8 +9,8 @@ router = APIRouter()
 @router.post("/run-scraper", response_model=ScraperResponse)
 async def run_scraper(request: ScraperRequest):
     try:
-        filename = scraper_service.run_scraper(request.query)
-        return {"message": "Scraping completed successfully", "filename": os.path.basename(filename)}
+        results, filename = scraper_service.run_scraper(request.query)
+        return {"message": "Scraping completed successfully", "filename": filename, "results": results}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

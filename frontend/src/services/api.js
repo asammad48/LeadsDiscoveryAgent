@@ -8,7 +8,7 @@ const api = axios.create({
 
 export const runScraper = async (params) => {
   try {
-    const response = await api.post('/api/run', params);
+    const response = await api.post('/api/run-scraper', params);
     return response.data;
   } catch (error) {
     console.error('Error running scraper:', error);
@@ -16,9 +16,9 @@ export const runScraper = async (params) => {
   }
 };
 
-export const downloadExcel = async () => {
+export const downloadExcel = async (filename) => {
   try {
-    const response = await api.get('/api/download', {
+    const response = await api.get(`/api/download-excel?filename=${filename}`, {
       responseType: 'blob',
     });
     const url = window.URL.createObjectURL(new Blob([response.data]));

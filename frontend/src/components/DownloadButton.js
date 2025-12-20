@@ -1,16 +1,15 @@
 import React from 'react';
-import * as XLSX from 'xlsx';
+import { downloadExcel } from '../services/api';
 
-const DownloadButton = ({ results }) => {
+const DownloadButton = ({ filename }) => {
   const handleDownload = () => {
-    const worksheet = XLSX.utils.json_to_sheet(results);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Leads');
-    XLSX.writeFile(workbook, 'leads.xlsx');
+    if (filename) {
+      downloadExcel(filename);
+    }
   };
 
   return (
-    <button onClick={handleDownload} disabled={!results || results.length === 0}>
+    <button onClick={handleDownload} disabled={!filename}>
       Download as Excel
     </button>
   );

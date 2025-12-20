@@ -1,29 +1,43 @@
-# AI-Powered Lead Discovery & Scraper Agent
+# Lead Discovery & Scraper Agent
 
-This project is an AI-powered agent for discovering and scraping leads from various sources. It is designed to be easily extensible for adding new data sources.
+This project is a web application that allows users to discover and scrape leads from various sources.
 
-## Architecture Overview
+## Local Run Instructions
 
-The agent is designed with a modular architecture to separate concerns and allow for easy extensibility.
+To run the application locally, you will need to have Python, Node.js, and npm installed.
 
-- **`main.py`**: The entry point of the application. It orchestrates the lead discovery and scraping process.
-- **`config.py`**: Contains configuration settings for the agent, such as API keys and data source configurations.
-- **`src/agent/models/lead.py`**: Defines the data model for a "Lead".
-- **`src/agent/sources/`**: This package contains modules for different lead sources. Each source module is responsible for scraping data from a specific source.
-    - **`base_source.py`**: Defines the abstract base class for all data sources, ensuring a consistent interface.
-- **`src/agent/storage/excel_storage.py`**: Handles saving the scraped lead data to an Excel file.
+1.  **Install dependencies:**
+    ```bash
+    pip install -r requirements.txt
+    cd frontend
+    npm install
+    ```
 
-## Execution Flow
+2.  **Start the backend server:**
+    ```bash
+    export PYTHONPATH=$PYTHONPATH:$(pwd)
+    uvicorn backend.main:app --host 0.0.0.0 --port 8000
+    ```
 
-1. **Initialization**: The `main.py` script is executed. It loads the configuration from `config.py`.
-2. **Source Selection**: The agent selects the data sources to scrape from (this will be configured in `config.py`).
-3. **Scraping**: For each selected source, the agent calls the `scrape` method of the corresponding source module.
-4. **Data Storage**: The scraped data, in the form of `Lead` objects, is passed to the `ExcelStorage` module.
-5. **Saving**: The `ExcelStorage` module saves the lead data to an Excel file in the `data/` directory.
+3.  **Start the frontend server:**
+    ```bash
+    cd frontend
+    npm start
+    ```
 
-## How to Add a New Source
+The application will be available at http://localhost:3000.
 
-1. Create a new file in `src/agent/sources/` (e.g., `new_source.py`).
-2. In this new file, create a class that inherits from `BaseSource` (defined in `base_source.py`).
-3. Implement the `scrape` method in your new class. This method should contain the logic for scraping leads from the new source.
-4. Update the configuration in `config.py` to include your new source.
+## CORS Verification
+
+CORS is configured in `backend/main.py` to allow requests from `http://localhost:3000`. This can be verified by running the application and making a request from the frontend to the backend.
+
+## Test Cases
+
+The following test cases can be used to verify the functionality of the application:
+
+1.  **Query:** "Top 5G companies in China"
+    **Expected result:** The results table should populate with data related to 5G companies in China, and the "Download as Excel" button should become active.
+2.  **Query:** "Leading AI research labs in Europe"
+    **Expected result:** The results table should display a list of AI research labs in Europe, and the download button should be enabled.
+3.  **Query:** "Best coffee shops in my neighborhood"
+    **Expected result:** The results table should show a list of nearby coffee shops, and the download button should be enabled.

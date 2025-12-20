@@ -15,10 +15,10 @@ def client():
 
 def test_run_scraper(client):
     with patch('backend.services.scraper.scraper_service.run_scraper') as mock_run_scraper:
-        mock_run_scraper.return_value = "output/test.xlsx"
+        mock_run_scraper.return_value = ([], "test.xlsx")
         response = client.post("/api/run-scraper", json={"query": "test query"})
         assert response.status_code == 200
-        assert response.json() == {"message": "Scraping completed successfully", "filename": "test.xlsx"}
+        assert response.json() == {"message": "Scraping completed successfully", "filename": "test.xlsx", "results": []}
         mock_run_scraper.assert_called_once_with("test query")
 
 def test_download_excel_file_found(client):

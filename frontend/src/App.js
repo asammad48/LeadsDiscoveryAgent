@@ -8,13 +8,15 @@ function App() {
   const [results, setResults] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [filename, setFilename] = useState(null);
 
   const handleSearch = async (params) => {
     setIsLoading(true);
     setError(null);
     try {
       const response = await runScraper(params);
-      setResults(response);
+      setResults(response.results);
+      setFilename(response.filename);
     } catch (err) {
       setError('An error occurred while running the scraper. Please try again.');
     } finally {
@@ -31,7 +33,7 @@ function App() {
         <SearchForm onSearch={handleSearch} isLoading={isLoading} />
         {error && <p className="error">{error}</p>}
         <ResultsTable results={results} />
-        <DownloadButton results={results} />
+        <DownloadButton filename={filename} />
       </main>
     </div>
   );
