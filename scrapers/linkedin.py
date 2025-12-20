@@ -3,19 +3,16 @@ from bs4 import BeautifulSoup
 from scrapers.base import BaseScraper
 from scrapers.registry import register_scraper
 from errors import NoResultsFoundError
+import asyncio
 
 @register_scraper
 class LinkedInScraper(BaseScraper):
-    """
-    Scrapes LinkedIn for social presence validation.
-    Extracts only business name, source URL, and a snippet/bio.
-    """
     platform = "linkedin"
 
-    def scrape(self, query: str) -> tuple[list[dict], dict | None]:
+    async def scrape(self, query: str) -> tuple[list[dict], dict | None]:
         print(f"Starting LinkedIn scrape for social presence validation: {query}")
-        with DDGS() as ddgs:
-            search_results = [r for r in ddgs.text(f"site:linkedin.com/company {query}", max_results=10)]
+        loop = asyncio.get_event_loop()
+        search_results = await loop.run_in_executor(None, self._perform_search, query)
 
         if not search_results:
             raise NoResultsFoundError(self.platform)
@@ -35,13 +32,15 @@ class LinkedInScraper(BaseScraper):
 
         return results, None
 
+    def _perform_search(self, query: str):
+        with DDGS() as ddgs:
+            return [r for r in ddgs.text(f"site:linkedin.com/company {query}", max_results=10)]
+
     def _clean_title(self, title: str) -> str:
-        """Removes common suffixes from LinkedIn page titles."""
         return title.replace(" | LinkedIn", "").strip()
 
     def _parse_search_results(self, soup: BeautifulSoup) -> list[str]:
         return []
 
     def _parse_profile_page(self, soup: BeautifulSoup, source_url: str) -> dict:
-        # This scraper does not visit pages.
         return {}
