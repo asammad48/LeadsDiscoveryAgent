@@ -1,39 +1,59 @@
-from facebook_scraper import get_posts
+from ddgs import DDGS
+from bs4 import BeautifulSoup
 from scrapers.base import BaseScraper
 from scrapers.registry import register_scraper
 from errors import NoResultsFoundError
 
 @register_scraper
 class FacebookScraper(BaseScraper):
+    """
+    Scrapes Facebook by using DuckDuckGo Search to find public business pages.
+    Directly scraping Facebook is often blocked, so this approach extracts data
+    from search result snippets.
+    """
     platform = "facebook"
 
     def scrape(self, query: str) -> tuple[list[dict], dict | None]:
-        try:
-            # In this version of facebook-scraper, there is no direct 'search_pages' function.
-            # A common workaround is to use get_posts with a generic but relevant page name,
-            # then filter the results for the query term. This is not a direct search, but it
-            # allows us to find public pages related to the query.
-            posts = list(get_posts(query, pages=1))
-        except Exception as e:
-            raise NoResultsFoundError(f"{self.platform}: The scraper was likely blocked by Facebook. Error: {e}")
+        """
+        Performs a search for Facebook pages and extracts data from the results.
+        """
+        print(f"Starting Facebook scrape for query: {query}")
+        with DDGS() as ddgs:
+            # Search for public Facebook pages related to the query
+            search_results = [r for r in ddgs.text(f"site:facebook.com {query}", max_results=10)]
 
-        if not posts:
+        if not search_results:
             raise NoResultsFoundError(self.platform)
 
+        print(f"Found {len(search_results)} Facebook links. Extracting data from snippets.")
         results = []
-        for post in posts:
-            # We treat the 'username' as the business name from the post context.
+        for result in search_results:
+            # For Facebook, we extract data from the search result snippet
+            # as visiting the page directly is unreliable.
+            business_name = result['title'].replace(" - Facebook", "").strip()
+
             results.append({
-                'business_name': post.get('username', 'N/A'),
-                'description/snippet': post.get('text', ''),
+                'business_name': business_name,
+                'description/snippet': result['body'],
                 'platform': self.platform,
-                'source_url': post.get('post_url', ''),
+                'source_url': result['href'],
+                'website': None,
+                'phone': None,
+                'address': None
             })
+            print(f"  > Extracted: {business_name}")
 
         return results, None
 
-    def _parse_search_results(self, soup) -> list[str]:
+    def _parse_search_results(self, soup: BeautifulSoup) -> list[str]:
+        """
+        Not used for this scraper as DDGS provides direct links.
+        """
         return []
 
-    def _parse_profile_page(self, soup, source_url: str) -> dict:
+    def _parse_profile_page(self, soup: BeautifulSoup, source_url: str) -> dict:
+        """
+        Direct parsing of Facebook pages is not implemented due to high likelihood of being blocked.
+        Data is extracted from search engine snippets instead.
+        """
         return {}
