@@ -1,34 +1,33 @@
 import pandas as pd
 import os
-from google_html_parser import parse_google_search_html
+import time
+from orchestrator import scrape_orchestrator
+import scrapers # Import the scrapers package to ensure registration
 
 class ScraperService:
-    def run_scraper(self, query: str) -> tuple[list, str]:
-        print(f"Parsing HTML for query: {query}")
+    def run_scraper(self, query: str) -> dict:
+        print(f"Running scrapers for query: {query}")
 
-        try:
-            with open('google_search_results.html', 'r', encoding='utf-8') as f:
-                html_content = f.read()
-        except FileNotFoundError:
-            print("Error: google_search_results.html not found.")
-            return [], ""
+        aggregated_results = scrape_orchestrator.run(query)
 
-        results, next_page_url = parse_google_search_html(html_content)
+        all_results = []
+        for platform, platform_results in aggregated_results['platforms'].items():
+            all_results.extend(platform_results)
 
-        df = pd.DataFrame(results)
+        if all_results:
+            df = pd.DataFrame(all_results)
+            output_dir = "output"
+            if not os.path.exists(output_dir):
+                os.makedirs(output_dir)
 
-        output_dir = "output"
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
+            timestamp = int(time.time())
+            filename = f"{output_dir}/aggregated_output_{timestamp}.xlsx"
+            df.to_excel(filename, index=False)
+            aggregated_results['filename'] = os.path.basename(filename)
+        else:
+            aggregated_results['filename'] = None
 
-        filename = f"{output_dir}/parsed_output.xlsx"
-        df.to_excel(filename, index=False)
-
-        if next_page_url:
-            with open(f"{output_dir}/next_page.txt", "w") as f:
-                f.write(next_page_url)
-
-        return df.to_dict(orient='records'), filename
+        return aggregated_results
 
     def get_excel_path(self, filename: str) -> str:
         return f"output/{filename}"
