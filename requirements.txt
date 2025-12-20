@@ -10,3 +10,4 @@ instaloader
 fastapi
 uvicorn[standard]
 python-multipart
+fuzzywuzzy
