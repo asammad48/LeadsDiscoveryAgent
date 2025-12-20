@@ -1,3 +1,4 @@
+from duckduckgo_search import DDGS
 from bs4 import BeautifulSoup
 from scrapers.base import BaseScraper
 from scrapers.registry import register_scraper
@@ -9,56 +10,32 @@ class LinkedInScraper(BaseScraper):
     platform = "linkedin"
 
     def scrape(self, query: str) -> tuple[list[dict], dict | None]:
-        search_url = f"https://www.linkedin.com/public-guest/search/companies?keywords={query}"
-        response = http_client.get(search_url)
+        with DDGS() as ddgs:
+            # Use DuckDuckGo to find company profile pages on LinkedIn
+            search_results = [r for r in ddgs.text(f"site:linkedin.com/company {query}", max_results=5)]
 
-        if not response:
+        if not search_results:
             raise NoResultsFoundError(self.platform)
 
-        soup = BeautifulSoup(response.text, 'html.parser')
-        profile_urls = self._parse_search_results(soup)
-
         results = []
-        for url in profile_urls:
-            profile_response = http_client.get(url)
-            if profile_response:
-                profile_soup = BeautifulSoup(profile_response.text, 'html.parser')
-                results.append(self._parse_profile_page(profile_soup, url))
+        for result in search_results:
+            profile_url = result['href']
+            # We have the profile URL, but fetching and parsing the full page is often blocked.
+            # For this fix, we will extract what we can from the search result itself.
+            results.append({
+                'business_name': result['title'].replace(" | LinkedIn", ""),
+                'description/snippet': result['body'],
+                'platform': self.platform,
+                'source_url': profile_url,
+            })
 
         return results, None
 
     def _parse_search_results(self, soup: BeautifulSoup) -> list[str]:
-        urls = []
-        for link in soup.find_all('a', href=True):
-            href = link['href']
-            if 'linkedin.com/company/' in href:
-                urls.append(href)
-        return list(set(urls))
+        # No longer used
+        return []
 
     def _parse_profile_page(self, soup: BeautifulSoup, source_url: str) -> dict:
-        business_name = None
-        for selector in ['h1.top-card-layout__title', 'h1', '.org-top-card-summary__title', 'h1[slot="top-card-layout-entity-info__title"]']:
-            element = soup.select_one(selector)
-            if element:
-                business_name = element.get_text(strip=True)
-                break
-
-        website = None
-        for el in soup.select('a[rel="nofollow"]'):
-            if "Visit website" in el.text:
-                website = el['href']
-                break
-        if not website:
-            website_el = soup.find('a', {'rel': 'nofollow', 'target': '_blank'})
-            website = website_el['href'] if website_el else None
-
-        description = soup.select_one('.about-section__description')
-
-        return {
-            'business_name': business_name or "N/A",
-            'platform': self.platform,
-            'website': website,
-            'social_url': source_url,
-            'source_url': source_url,
-            'description/snippet': description.text.strip() if description else None
-        }
+        # Parsing the live profile page is unreliable, so we extract from search results instead.
+        # This function can be kept for future enhancements if direct fetching becomes possible.
+        return {}
