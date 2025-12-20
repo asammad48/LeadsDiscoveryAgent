@@ -7,7 +7,11 @@ class ScrapeOrchestrator:
         pagination = {}
         errors = []
 
-        for platform, scraper in scraper_registry._scrapers.items():
+        # Use a controlled list of platforms to run
+        platforms_to_run = ["google_search", "google_maps", "facebook", "linkedin", "instagram"]
+
+        for platform in platforms_to_run:
+            scraper = scraper_registry.get_scraper(platform)
             try:
                 platform_results, platform_pagination = scraper.scrape(query)
                 results[platform] = platform_results
@@ -18,12 +22,15 @@ class ScrapeOrchestrator:
             except ScraperError as e:
                 errors.append(e.to_dict())
             except Exception as e:
+                # Wrap unexpected errors in a ScraperError for consistent reporting
+                error_details = f"An unexpected error occurred: {type(e).__name__} - {e}"
+                unexpected_error = ScraperError(
+                    platform=platform,
+                    reason=error_details,
+                    recommended_action="Manual review required. The scraper's underlying library may have failed."
+                )
+                errors.append(unexpected_error.to_dict())
                 print(f"An unexpected error occurred for platform '{platform}': {e}")
-                errors.append({
-                    "platform": platform,
-                    "reason": "An unexpected error occurred.",
-                    "action_required": "Manual review"
-                })
 
         return {
             "query": query,

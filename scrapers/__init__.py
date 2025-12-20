@@ -4,4 +4,3 @@ from . import google_maps
 from . import facebook
 from . import linkedin
 from . import instagram
-from . import directory

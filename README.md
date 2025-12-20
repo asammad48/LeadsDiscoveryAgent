@@ -2,6 +2,12 @@
 
 This project is a web application that allows users to discover and scrape leads from various sources. It is built with a modular and extensible architecture that allows for easy addition of new scraping platforms.
 
+## Current Status: Experimental
+
+This project is currently **experimental**. While the scrapers are designed to be resilient, they rely on parsing third-party websites and are subject to breaking without notice if the source HTML structure changes. The underlying libraries may also be blocked by the target platforms.
+
+**Use in a production environment is not recommended without active monitoring and maintenance.**
+
 ## Architecture Overview
 
 The scraping architecture is designed to be robust and easy to maintain. It consists of the following components:
