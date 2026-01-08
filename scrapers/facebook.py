@@ -1,39 +1,46 @@
-from facebook_scraper import get_posts
+from ddgs import DDGS
 from scrapers.base import BaseScraper
 from scrapers.registry import register_scraper
 from errors import NoResultsFoundError
+from bs4 import BeautifulSoup
+import asyncio
 
 @register_scraper
 class FacebookScraper(BaseScraper):
     platform = "facebook"
 
-    def scrape(self, query: str) -> tuple[list[dict], dict | None]:
-        try:
-            # In this version of facebook-scraper, there is no direct 'search_pages' function.
-            # A common workaround is to use get_posts with a generic but relevant page name,
-            # then filter the results for the query term. This is not a direct search, but it
-            # allows us to find public pages related to the query.
-            posts = list(get_posts(query, pages=1))
-        except Exception as e:
-            raise NoResultsFoundError(f"{self.platform}: The scraper was likely blocked by Facebook. Error: {e}")
+    async def scrape(self, query: str) -> tuple[list[dict], dict | None]:
+        print(f"Starting Facebook scrape for social presence validation: {query}")
+        loop = asyncio.get_event_loop()
+        search_results = await loop.run_in_executor(None, self._perform_search, query)
 
-        if not posts:
+        if not search_results:
             raise NoResultsFoundError(self.platform)
 
+        print(f"Found {len(search_results)} potential Facebook pages.")
         results = []
-        for post in posts:
-            # We treat the 'username' as the business name from the post context.
+        for result in search_results:
+            business_name = self._clean_title(result.get('title', ''))
+
             results.append({
-                'business_name': post.get('username', 'N/A'),
-                'description/snippet': post.get('text', ''),
                 'platform': self.platform,
-                'source_url': post.get('post_url', ''),
+                'business_name': business_name,
+                'source_url': result.get('href'),
+                'description/snippet': result.get('body'),
             })
+            print(f"  > Found social presence for: {business_name}")
 
         return results, None
 
-    def _parse_search_results(self, soup) -> list[str]:
+    def _perform_search(self, query: str):
+        with DDGS() as ddgs:
+            return [r for r in ddgs.text(f"site:facebook.com {query}", max_results=10)]
+
+    def _clean_title(self, title: str) -> str:
+        return title.replace(" - Facebook", "").replace(" | Facebook", "").strip()
+
+    def _parse_search_results(self, soup: BeautifulSoup) -> list[str]:
         return []
 
-    def _parse_profile_page(self, soup, source_url: str) -> dict:
+    def _parse_profile_page(self, soup: BeautifulSoup, source_url: str) -> dict:
         return {}

@@ -1,41 +1,46 @@
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 from bs4 import BeautifulSoup
 from scrapers.base import BaseScraper
 from scrapers.registry import register_scraper
 from errors import NoResultsFoundError
-from utils.http_client import http_client
+import asyncio
 
 @register_scraper
 class LinkedInScraper(BaseScraper):
     platform = "linkedin"
 
-    def scrape(self, query: str) -> tuple[list[dict], dict | None]:
-        with DDGS() as ddgs:
-            # Use DuckDuckGo to find company profile pages on LinkedIn
-            search_results = [r for r in ddgs.text(f"site:linkedin.com/company {query}", max_results=5)]
+    async def scrape(self, query: str) -> tuple[list[dict], dict | None]:
+        print(f"Starting LinkedIn scrape for social presence validation: {query}")
+        loop = asyncio.get_event_loop()
+        search_results = await loop.run_in_executor(None, self._perform_search, query)
 
         if not search_results:
             raise NoResultsFoundError(self.platform)
 
+        print(f"Found {len(search_results)} potential LinkedIn pages.")
         results = []
         for result in search_results:
-            profile_url = result['href']
-            # We have the profile URL, but fetching and parsing the full page is often blocked.
-            # For this fix, we will extract what we can from the search result itself.
+            business_name = self._clean_title(result.get('title', ''))
+
             results.append({
-                'business_name': result['title'].replace(" | LinkedIn", ""),
-                'description/snippet': result['body'],
                 'platform': self.platform,
-                'source_url': profile_url,
+                'business_name': business_name,
+                'source_url': result.get('href'),
+                'description/snippet': result.get('body'),
             })
+            print(f"  > Found social presence for: {business_name}")
 
         return results, None
 
+    def _perform_search(self, query: str):
+        with DDGS() as ddgs:
+            return [r for r in ddgs.text(f"site:linkedin.com/company {query}", max_results=10)]
+
+    def _clean_title(self, title: str) -> str:
+        return title.replace(" | LinkedIn", "").strip()
+
     def _parse_search_results(self, soup: BeautifulSoup) -> list[str]:
-        # No longer used
         return []
 
     def _parse_profile_page(self, soup: BeautifulSoup, source_url: str) -> dict:
-        # Parsing the live profile page is unreliable, so we extract from search results instead.
-        # This function can be kept for future enhancements if direct fetching becomes possible.
         return {}

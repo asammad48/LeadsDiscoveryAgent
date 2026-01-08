@@ -9,7 +9,7 @@ router = APIRouter()
 @router.post("/run-scraper", response_model=ScraperResponse)
 async def run_scraper(request: ScraperRequest):
     try:
-        results = scraper_service.run_scraper(request.query)
+        results = await scraper_service.run_scraper(request.query)
         return results
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -17,7 +17,6 @@ async def run_scraper(request: ScraperRequest):
 @router.get("/download-excel")
 async def download_excel(filename: str):
     try:
-        # Basic security check to prevent directory traversal
         if ".." in filename or "/" in filename:
             raise HTTPException(status_code=400, detail="Invalid filename")
 

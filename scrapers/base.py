@@ -1,14 +1,14 @@
 from abc import ABC, abstractmethod
 from bs4 import BeautifulSoup
+import asyncio
 
 class BaseScraper(ABC):
     platform: str
 
     @abstractmethod
-    def scrape(self, query: str) -> tuple[list[dict], dict | None]:
+    async def scrape(self, query: str) -> tuple[list[dict], dict | None]:
         """
-        The main entry point for the scraper. It orchestrates the entire
-        scraping process, from searching to parsing the final results.
+        The main asynchronous entry point for the scraper.
         """
         pass
 
